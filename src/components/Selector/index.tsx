@@ -290,6 +290,11 @@ export const StatusSelector = ({
   );
 };
 
+interface KeywordOption {
+  label: string;
+  value: number;
+  excluded: boolean;
+}
 export const KeywordSelector = ({
   isMulti,
   isDisabled,
@@ -298,7 +303,7 @@ export const KeywordSelector = ({
 }: BaseSelectorMultiProps | BaseSelectorSingleProps) => {
   const intl = useIntl();
   const [defaultDataValue, setDefaultDataValue] = useState<
-    { label: string; value: number }[] | null
+    { label: string; value: number; excluded: boolean }[] | null
   >(null);
 
   useEffect(() => {
@@ -310,10 +315,10 @@ export const KeywordSelector = ({
       const keywords = await Promise.all(
         defaultValue.split(',').map(async (keywordId) => {
           const keyword = await axios.get<Keyword>(
-            `/api/v1/keyword/${keywordId}`
+            `/api/v1/keyword/${keywordId.replace(/^-/, '')}`
           );
 
-          return keyword.data;
+          return { ...keyword.data, excluded: keywordId.startsWith('-') };
         })
       );
 
@@ -321,6 +326,7 @@ export const KeywordSelector = ({
         keywords.map((keyword) => ({
           label: keyword.name,
           value: keyword.id,
+          excluded: keyword.excluded,
         }))
       );
     };
@@ -333,7 +339,7 @@ export const KeywordSelector = ({
       '/api/v1/search/keyword',
       {
         params: {
-          query: encodeURIExtraParams(inputValue),
+          query: encodeURIExtraParams(inputValue.replace(/^-/, '')),
         },
       }
     );
@@ -341,6 +347,7 @@ export const KeywordSelector = ({
     return results.data.results.map((result) => ({
       label: result.name,
       value: result.id,
+      excluded: inputValue.startsWith('-'),
     }));
   };
 
@@ -351,6 +358,11 @@ export const KeywordSelector = ({
       isMulti={isMulti}
       isDisabled={isDisabled}
       className="react-select-container"
+      classNames={{
+        multiValue({ data }) {
+          return data?.excluded ? 'react-select__multi-value--excluded' : '';
+        },
+      }}
       classNamePrefix="react-select"
       noOptionsMessage={({ inputValue }) =>
         inputValue === ''
@@ -360,9 +372,23 @@ export const KeywordSelector = ({
       defaultValue={defaultDataValue}
       loadOptions={loadKeywordOptions}
       placeholder={intl.formatMessage(messages.searchKeywords)}
-      onChange={(value) => {
+      onChange={(option) => {
+        const isMultiValue = (v: unknown): v is MultiValue<KeywordOption> =>
+          Array.isArray(v);
+        const getOption = ({ label, value, excluded }: KeywordOption) => ({
+          label: label,
+          value: Number(`${excluded && '-'}${value}`),
+        });
+        const val = (() => {
+          if (isMultiValue(option)) {
+            return option.map(getOption);
+          } else if (option) {
+            return getOption(option);
+          }
+          return null;
+        })();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onChange(value as any);
+        onChange(val as any);
       }}
     />
   );

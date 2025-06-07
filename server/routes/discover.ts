@@ -21,6 +21,7 @@ import {
   mapTvResult,
 } from '@server/models/Search';
 import { mapNetwork } from '@server/models/Tv';
+import { parseExcludableFields } from '@server/utils/parseExcludableFields';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -89,7 +90,7 @@ discoverRoutes.get('/movies', async (req, res, next) => {
 
   try {
     const query = ApiQuerySchema.parse(req.query);
-    const keywords = query.keywords;
+    const [keywords, withoutKeywords] = parseExcludableFields(query.keywords);
 
     const data = await tmdb.getDiscoverMovies({
       page: Number(query.page),
@@ -105,6 +106,7 @@ discoverRoutes.get('/movies', async (req, res, next) => {
         ? new Date(query.primaryReleaseDateGte).toISOString().split('T')[0]
         : undefined,
       keywords,
+      withoutKeywords,
       withRuntimeGte: query.withRuntimeGte,
       withRuntimeLte: query.withRuntimeLte,
       voteAverageGte: query.voteAverageGte,
@@ -130,7 +132,9 @@ discoverRoutes.get('/movies', async (req, res, next) => {
 
       keywordData = await Promise.all(
         splitKeywords.map(async (keywordId) => {
-          return await tmdb.getKeywordDetails({ keywordId: Number(keywordId) });
+          return await tmdb.getKeywordDetails({
+            keywordId: Math.abs(Number(keywordId)),
+          });
         })
       );
     }
@@ -376,7 +380,8 @@ discoverRoutes.get('/tv', async (req, res, next) => {
 
   try {
     const query = ApiQuerySchema.parse(req.query);
-    const keywords = query.keywords;
+    const [keywords, withoutKeywords] = parseExcludableFields(query.keywords);
+
     const data = await tmdb.getDiscoverTv({
       page: Number(query.page),
       sortBy: query.sortBy as SortOptions,
@@ -391,6 +396,7 @@ discoverRoutes.get('/tv', async (req, res, next) => {
         : undefined,
       originalLanguage: query.language,
       keywords,
+      withoutKeywords,
       withRuntimeGte: query.withRuntimeGte,
       withRuntimeLte: query.withRuntimeLte,
       voteAverageGte: query.voteAverageGte,
@@ -417,7 +423,9 @@ discoverRoutes.get('/tv', async (req, res, next) => {
 
       keywordData = await Promise.all(
         splitKeywords.map(async (keywordId) => {
-          return await tmdb.getKeywordDetails({ keywordId: Number(keywordId) });
+          return await tmdb.getKeywordDetails({
+            keywordId: Math.abs(Number(keywordId)),
+          });
         })
       );
     }

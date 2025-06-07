@@ -442,8 +442,17 @@
     @apply rounded-md border border-gray-500 bg-gray-800;
   }
 
+  .react-select-container .react-select__multi-value--excluded {
+    @apply border-amber-600 bg-amber-900;
+  }
+
   .react-select-container .react-select__multi-value__label {
     @apply text-white;
+  }
+  .react-select-container
+    .react-select__multi-value--excluded
+    .react-select__multi-value__label {
+    @apply text-amber-100;
   }
 
   .react-select-container .react-select__multi-value__remove {

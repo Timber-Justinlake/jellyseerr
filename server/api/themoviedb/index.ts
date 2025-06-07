@@ -85,6 +85,7 @@ interface DiscoverMovieOptions {
   genre?: string;
   studio?: string;
   keywords?: string;
+  withoutKeywords?: string;
   sortBy?: SortOptions;
   watchRegion?: string;
   watchProviders?: string;
@@ -110,6 +111,7 @@ interface DiscoverTvOptions {
   genre?: string;
   network?: number;
   keywords?: string;
+  withoutKeywords?: string;
   sortBy?: SortOptions;
   watchRegion?: string;
   watchProviders?: string;
@@ -487,6 +489,7 @@ class TheMovieDb extends ExternalAPI {
     genre,
     studio,
     keywords,
+    withoutKeywords,
     withRuntimeGte,
     withRuntimeLte,
     voteAverageGte,
@@ -537,6 +540,7 @@ class TheMovieDb extends ExternalAPI {
           with_genres: genre,
           with_companies: studio,
           with_keywords: keywords,
+          without_keywords: withoutKeywords,
           'with_runtime.gte': withRuntimeGte,
           'with_runtime.lte': withRuntimeLte,
           'vote_average.gte': voteAverageGte,
@@ -569,6 +573,7 @@ class TheMovieDb extends ExternalAPI {
     genre,
     network,
     keywords,
+    withoutKeywords,
     withRuntimeGte,
     withRuntimeLte,
     voteAverageGte,
@@ -620,6 +625,7 @@ class TheMovieDb extends ExternalAPI {
           with_genres: genre,
           with_networks: network,
           with_keywords: keywords,
+          without_keywords: withoutKeywords,
           'with_runtime.gte': withRuntimeGte,
           'with_runtime.lte': withRuntimeLte,
           'vote_average.gte': voteAverageGte,
