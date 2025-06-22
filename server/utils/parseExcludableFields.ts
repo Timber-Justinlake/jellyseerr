@@ -3,7 +3,7 @@ export type IncludedFields = FieldStr;
 export type ExcludedFields = FieldStr;
 
 /**
- * Takes a comma-separated string of fields and returns an object with two properties:
+ * Takes a comma (or pipe) separated string of fields and returns an object with two properties:
  * - `include` containing fields that do not start with a hyphen,
  * - `exclude` containing fields that start with a hyphen (without the hyphen).
  *
@@ -16,14 +16,16 @@ export function parseExcludableFields(
 ): [IncludedFields, ExcludedFields] {
   if (!fieldsStr) return [undefined, undefined];
 
-  const fields = fieldsStr.split(',').map((f) => f.trim());
+  const separator = fieldsStr.includes(',') ? ',' : '|';
+  const fields = fieldsStr.split(separator).map((f) => f.trim());
 
-  const include = fields.filter(withHyphen(false)).join(',') || undefined;
+  const include =
+    fields.filter(withExclusionPrefix(false)).join(separator) || undefined;
   const exclude =
     fields
-      .filter(withHyphen(true))
+      .filter(withExclusionPrefix(true))
       .map((f) => f.slice(1))
-      .join(',') || undefined;
+      .join(separator) || undefined;
 
   return [include, exclude];
 }
@@ -32,6 +34,6 @@ export function parseExcludableFields(
  * Returns a filter function that checks if a string starts with a hyphen and
  * checks if that is the desired condition.
  */
-function withHyphen(wantsHyphen: boolean) {
-  return (val: string) => wantsHyphen === val.startsWith('-');
+function withExclusionPrefix(wantsPrefix: boolean) {
+  return (val: string) => wantsPrefix === val.startsWith('-');
 }

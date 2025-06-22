@@ -90,15 +90,22 @@ discoverRoutes.get('/movies', async (req, res, next) => {
 
   try {
     const query = ApiQuerySchema.parse(req.query);
+    const [genre, withoutGenres] = parseExcludableFields(query.genre);
     const [keywords, withoutKeywords] = parseExcludableFields(query.keywords);
+    const [studio, withoutStudios] = parseExcludableFields(query.studio);
+    const [watchProviders, withoutWatchProviders] = parseExcludableFields(
+      query.watchProviders
+    );
 
     const data = await tmdb.getDiscoverMovies({
       page: Number(query.page),
       sortBy: query.sortBy as SortOptions,
       language: req.locale ?? query.language,
       originalLanguage: query.language,
-      genre: query.genre,
-      studio: query.studio,
+      genre,
+      withoutGenres,
+      studio,
+      withoutStudios,
       primaryReleaseDateLte: query.primaryReleaseDateLte
         ? new Date(query.primaryReleaseDateLte).toISOString().split('T')[0]
         : undefined,
@@ -113,7 +120,8 @@ discoverRoutes.get('/movies', async (req, res, next) => {
       voteAverageLte: query.voteAverageLte,
       voteCountGte: query.voteCountGte,
       voteCountLte: query.voteCountLte,
-      watchProviders: query.watchProviders,
+      watchProviders,
+      withoutWatchProviders,
       watchRegion: query.watchRegion,
       certification: query.certification,
       certificationGte: query.certificationGte,
@@ -380,13 +388,18 @@ discoverRoutes.get('/tv', async (req, res, next) => {
 
   try {
     const query = ApiQuerySchema.parse(req.query);
+    const [genre, withoutGenres] = parseExcludableFields(query.genre);
     const [keywords, withoutKeywords] = parseExcludableFields(query.keywords);
+    const [watchProviders, withoutWatchProviders] = parseExcludableFields(
+      query.watchProviders
+    );
 
     const data = await tmdb.getDiscoverTv({
       page: Number(query.page),
       sortBy: query.sortBy as SortOptions,
       language: req.locale ?? query.language,
-      genre: query.genre,
+      genre,
+      withoutGenres,
       network: query.network ? Number(query.network) : undefined,
       firstAirDateLte: query.firstAirDateLte
         ? new Date(query.firstAirDateLte).toISOString().split('T')[0]
@@ -403,7 +416,8 @@ discoverRoutes.get('/tv', async (req, res, next) => {
       voteAverageLte: query.voteAverageLte,
       voteCountGte: query.voteCountGte,
       voteCountLte: query.voteCountLte,
-      watchProviders: query.watchProviders,
+      watchProviders,
+      withoutWatchProviders,
       watchRegion: query.watchRegion,
       withStatus: query.status,
       certification: query.certification,

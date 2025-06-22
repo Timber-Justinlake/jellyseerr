@@ -5,6 +5,13 @@ import RegionSelector from '@app/components/RegionSelector';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  formatSingleVal,
+  isExcluded,
+  makeExcludedId,
+  stripPrefix,
+  type ExcludableSingleVal,
+} from '@app/utils/excludableHelpers';
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import type {
@@ -157,7 +164,7 @@ export const GenreSelector = ({
 }: GenreSelectorProps) => {
   const intl = useIntl();
   const [defaultDataValue, setDefaultDataValue] = useState<
-    { label: string; value: number }[] | null
+    ExcludableSingleVal[] | null
   >(null);
 
   useEffect(() => {
@@ -168,16 +175,19 @@ export const GenreSelector = ({
 
       const genres = defaultValue.split(',');
 
-      const response = await axios.get<TmdbGenre[]>(`/api/v1/genres/${type}`);
+      const { data } = await axios.get<TmdbGenre[]>(`/api/v1/genres/${type}`);
 
       const genreData = genres
-        .filter((genre) => response.data.find((gd) => gd.id === Number(genre)))
-        .map((g) => response.data.find((gd) => gd.id === Number(g)))
-        .map((g) => ({
-          label: g?.name ?? '',
-          value: g?.id ?? 0,
-        }));
-
+        .map((g) => {
+          const genre = data.find((gd) => gd.id === Number(stripPrefix(g)));
+          if (!genre) return;
+          return {
+            label: genre.name,
+            value: genre.id,
+            excluded: isExcluded(g),
+          };
+        })
+        .filter((v): v is ExcludableSingleVal => v !== undefined);
       setDefaultDataValue(genreData);
     };
 
@@ -193,9 +203,10 @@ export const GenreSelector = ({
       .map((result) => ({
         label: result.name,
         value: result.id,
+        excluded: isExcluded(inputValue),
       }))
       .filter(({ label }) =>
-        label.toLowerCase().includes(inputValue.toLowerCase())
+        label.toLowerCase().includes(stripPrefix(inputValue).toLowerCase())
       );
   };
 
@@ -203,6 +214,11 @@ export const GenreSelector = ({
     <AsyncSelect
       key={`genre-select-${defaultDataValue}`}
       className="react-select-container"
+      classNames={{
+        multiValue({ data }) {
+          return data?.excluded ? 'react-select__multi-value--excluded' : '';
+        },
+      }}
       classNamePrefix="react-select"
       defaultValue={isMulti ? defaultDataValue : defaultDataValue?.[0]}
       defaultOptions
@@ -211,9 +227,10 @@ export const GenreSelector = ({
       isDisabled={isDisabled}
       loadOptions={loadGenreOptions}
       placeholder={intl.formatMessage(messages.searchGenres)}
-      onChange={(value) => {
+      onChange={(option) => {
+        const val = formatSingleVal(option);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onChange(value as any);
+        onChange(val as any);
       }}
     />
   );
@@ -290,11 +307,6 @@ export const StatusSelector = ({
   );
 };
 
-interface KeywordOption {
-  label: string;
-  value: number;
-  excluded: boolean;
-}
 export const KeywordSelector = ({
   isMulti,
   isDisabled,
@@ -303,7 +315,7 @@ export const KeywordSelector = ({
 }: BaseSelectorMultiProps | BaseSelectorSingleProps) => {
   const intl = useIntl();
   const [defaultDataValue, setDefaultDataValue] = useState<
-    { label: string; value: number; excluded: boolean }[] | null
+    ExcludableSingleVal[] | null
   >(null);
 
   useEffect(() => {
@@ -315,10 +327,10 @@ export const KeywordSelector = ({
       const keywords = await Promise.all(
         defaultValue.split(',').map(async (keywordId) => {
           const keyword = await axios.get<Keyword>(
-            `/api/v1/keyword/${keywordId.replace(/^-/, '')}`
+            `/api/v1/keyword/${stripPrefix(keywordId)}`
           );
 
-          return { ...keyword.data, excluded: keywordId.startsWith('-') };
+          return { ...keyword.data, excluded: isExcluded(keywordId) };
         })
       );
 
@@ -339,7 +351,7 @@ export const KeywordSelector = ({
       '/api/v1/search/keyword',
       {
         params: {
-          query: encodeURIExtraParams(inputValue.replace(/^-/, '')),
+          query: encodeURIExtraParams(`${stripPrefix(inputValue)}`),
         },
       }
     );
@@ -347,7 +359,7 @@ export const KeywordSelector = ({
     return results.data.results.map((result) => ({
       label: result.name,
       value: result.id,
-      excluded: inputValue.startsWith('-'),
+      excluded: isExcluded(inputValue),
     }));
   };
 
@@ -373,20 +385,7 @@ export const KeywordSelector = ({
       loadOptions={loadKeywordOptions}
       placeholder={intl.formatMessage(messages.searchKeywords)}
       onChange={(option) => {
-        const isMultiValue = (v: unknown): v is MultiValue<KeywordOption> =>
-          Array.isArray(v);
-        const getOption = ({ label, value, excluded }: KeywordOption) => ({
-          label: label,
-          value: Number(`${excluded && '-'}${value}`),
-        });
-        const val = (() => {
-          if (isMultiValue(option)) {
-            return option.map(getOption);
-          } else if (option) {
-            return getOption(option);
-          }
-          return null;
-        })();
+        const val = formatSingleVal(option);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onChange(val as any);
       }}
@@ -398,14 +397,16 @@ type WatchProviderSelectorProps = {
   type: 'movie' | 'tv';
   region?: string;
   activeProviders?: number[];
-  onChange: (region: string, value: number[]) => void;
+  excludedProviders?: number[];
+  onChange: (region: string, value: number[], exclude?: boolean) => void;
 };
 
 export const WatchProviderSelector = ({
   type,
   onChange,
   region,
-  activeProviders,
+  activeProviders = [],
+  excludedProviders = [],
 }: WatchProviderSelectorProps) => {
   const intl = useIntl();
   const { currentSettings } = useSettings();
@@ -417,9 +418,10 @@ export const WatchProviderSelector = ({
       ? currentSettings.discoverRegion
       : 'US'
   );
-  const [activeProvider, setActiveProvider] = useState<number[]>(
-    activeProviders ?? []
-  );
+  const [activeProvider, setActiveProvider] =
+    useState<number[]>(activeProviders);
+  const [excludedProvider, setExcludedProvider] =
+    useState<number[]>(excludedProviders);
   const { data, isLoading } = useSWR<WatchProviderDetails[]>(
     `/api/v1/watchproviders/${
       type === 'movie' ? 'movies' : 'tv'
@@ -427,10 +429,11 @@ export const WatchProviderSelector = ({
   );
 
   useEffect(() => {
-    onChange(watchRegion, activeProvider);
+    const exclude = excludedProvider.length > 0;
+    onChange(watchRegion, exclude ? excludedProvider : activeProvider);
     // removed onChange as a dependency as we only need to call it when the value(s) change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProvider, watchRegion]);
+  }, [activeProvider, excludedProvider, watchRegion]);
 
   const orderedData = useMemo(() => {
     if (!data) {
@@ -440,11 +443,35 @@ export const WatchProviderSelector = ({
     return orderBy(data, ['display_priority'], ['asc']);
   }, [data]);
 
-  const toggleProvider = (id: number) => {
-    if (activeProvider.includes(id)) {
-      setActiveProvider(activeProvider.filter((p) => p !== id));
+  const toggleProvider = (
+    e: React.MouseEvent | React.KeyboardEvent,
+    id: number
+  ) => {
+    const shouldExclude = e.ctrlKey;
+
+    if (shouldExclude && activeProvider.length > 0) {
+      setActiveProvider([]);
+    }
+    if (!shouldExclude && excludedProvider.length > 0) {
+      setExcludedProvider([]);
+    }
+
+    if (
+      excludedProvider.includes(makeExcludedId(id)) ||
+      activeProvider.includes(id)
+    ) {
+      const removeIdFromProvider = (p: number) => Number(stripPrefix(p)) !== id;
+
+      setActiveProvider(activeProvider.filter(removeIdFromProvider));
+      setExcludedProvider(excludedProvider.filter(removeIdFromProvider));
     } else {
-      setActiveProvider([...activeProvider, id]);
+      const provider = shouldExclude ? excludedProvider : activeProvider;
+      const setProvider = shouldExclude
+        ? setExcludedProvider
+        : setActiveProvider;
+      const newId = shouldExclude ? makeExcludedId(id) : id;
+
+      setProvider([...provider, newId]);
     }
   };
 
@@ -472,21 +499,22 @@ export const WatchProviderSelector = ({
           <div className="provider-icons grid gap-2">
             {initialProviders.map((provider) => {
               const isActive = activeProvider.includes(provider.id);
+              const isExcluded = excludedProvider.includes(
+                makeExcludedId(provider.id)
+              );
               return (
                 <Tooltip
                   content={provider.name}
                   key={`prodiver-${provider.id}`}
                 >
                   <div
-                    className={`provider-container w-full cursor-pointer rounded-lg ring-1 ${
-                      isActive
-                        ? 'bg-gray-600 ring-indigo-500 hover:bg-gray-500'
-                        : 'bg-gray-700 ring-gray-500 hover:bg-gray-600'
-                    }`}
-                    onClick={() => toggleProvider(provider.id)}
+                    className={`provider-container ${
+                      isActive ? 'provider--active' : ''
+                    } ${isExcluded ? 'provider--excluded' : ''}`}
+                    onClick={(e) => toggleProvider(e, provider.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        toggleProvider(provider.id);
+                        toggleProvider(e, provider.id);
                       }
                     }}
                     role="button"
@@ -515,21 +543,22 @@ export const WatchProviderSelector = ({
             <div className="provider-icons relative top-2 grid gap-2">
               {otherProviders.map((provider) => {
                 const isActive = activeProvider.includes(provider.id);
+                const isExcluded = excludedProvider.includes(
+                  makeExcludedId(provider.id)
+                );
                 return (
                   <Tooltip
                     content={provider.name}
                     key={`prodiver-${provider.id}`}
                   >
                     <div
-                      className={`provider-container w-full cursor-pointer rounded-lg ring-1 transition ${
-                        isActive
-                          ? 'bg-gray-600 ring-indigo-500 hover:bg-gray-500'
-                          : 'bg-gray-700 ring-gray-500 hover:bg-gray-600'
-                      }`}
-                      onClick={() => toggleProvider(provider.id)}
+                      className={`provider-container ${
+                        isActive ? 'provider--active' : ''
+                      } ${isExcluded ? 'provider--excluded' : ''}`}
+                      onClick={(e) => toggleProvider(e, provider.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          toggleProvider(provider.id);
+                          toggleProvider(e, provider.id);
                         }
                       }}
                       role="button"

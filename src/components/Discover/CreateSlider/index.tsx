@@ -2,18 +2,21 @@ import Button from '@app/components/Common/Button';
 import Tooltip from '@app/components/Common/Tooltip';
 import { sliderTitles } from '@app/components/Discover/constants';
 import MediaSlider from '@app/components/MediaSlider';
-import { WatchProviderSelector } from '@app/components/Selector';
+import {
+  KeywordSelector,
+  WatchProviderSelector,
+} from '@app/components/Selector';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import defineMessages from '@app/utils/defineMessages';
+import { getExcludedIds, getIncludedIds } from '@app/utils/excludableHelpers';
 import type {
   TmdbCompanySearchResponse,
   TmdbGenre,
-  TmdbKeywordSearchResponse,
 } from '@server/api/themoviedb/interfaces';
 import { DiscoverSliderType } from '@server/constants/discover';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import type { GenreSliderItem } from '@server/interfaces/api/discoverInterfaces';
-import type { Keyword, ProductionCompany } from '@server/models/common';
+import type { ProductionCompany } from '@server/models/common';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useCallback, useEffect, useState } from 'react';
@@ -70,29 +73,6 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
 
   useEffect(() => {
     if (slider) {
-      const loadDefaultKeywords = async (): Promise<void> => {
-        if (!slider.data) {
-          return;
-        }
-
-        const keywords = await Promise.all(
-          slider.data.split(',').map(async (keywordId) => {
-            const keyword = await axios.get<Keyword>(
-              `/api/v1/keyword/${keywordId}`
-            );
-
-            return keyword.data;
-          })
-        );
-
-        setDefaultDataValue(
-          keywords.map((keyword) => ({
-            label: keyword.name,
-            value: keyword.id,
-          }))
-        );
-      };
-
       const loadDefaultGenre = async (): Promise<void> => {
         if (!slider.data) {
           return;
@@ -136,10 +116,6 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
       };
 
       switch (slider.type) {
-        case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
-        case DiscoverSliderType.TMDB_TV_KEYWORD:
-          loadDefaultKeywords();
-          break;
         case DiscoverSliderType.TMDB_MOVIE_GENRE:
         case DiscoverSliderType.TMDB_TV_GENRE:
           loadDefaultGenre();
@@ -166,22 +142,6 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
     },
     [setResultCount]
   );
-
-  const loadKeywordOptions = async (inputValue: string) => {
-    const results = await axios.get<TmdbKeywordSearchResponse>(
-      '/api/v1/search/keyword',
-      {
-        params: {
-          query: encodeURIExtraParams(inputValue),
-        },
-      }
-    );
-
-    return results.data.results.map((result) => ({
-      label: result.name,
-      value: result.id,
-    }));
-  };
 
   const loadCompanyOptions = async (inputValue: string) => {
     if (inputValue === '') {
@@ -360,23 +320,11 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
           case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
           case DiscoverSliderType.TMDB_TV_KEYWORD:
             dataInput = (
-              <AsyncSelect
-                key={`keyword-select-${defaultDataValue}`}
-                inputId="data"
+              <KeywordSelector
+                defaultValue={defaultDataValue?.map((v) => v.value).join(',')}
                 isMulti
-                className="react-select-container"
-                classNamePrefix="react-select"
-                noOptionsMessage={({ inputValue }) =>
-                  inputValue === ''
-                    ? intl.formatMessage(messages.starttyping)
-                    : intl.formatMessage(messages.nooptions)
-                }
-                defaultValue={defaultDataValue}
-                loadOptions={loadKeywordOptions}
-                placeholder={intl.formatMessage(messages.searchKeywords)}
                 onChange={(value) => {
-                  const keywords = value.map((item) => item.value).join(',');
-
+                  const keywords = value?.map((v) => v.value).join(',');
                   setFieldValue('data', keywords);
                 }}
               />
@@ -438,14 +386,16 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
               <WatchProviderSelector
                 type={'movie'}
                 region={slider?.data?.split(',')[0]}
-                activeProviders={
-                  slider?.data
-                    ?.split(',')[1]
-                    .split('|')
-                    .map((v) => Number(v)) ?? []
-                }
+                activeProviders={getIncludedIds(slider?.data?.split('|')[1])}
+                excludedProviders={getExcludedIds(slider?.data?.split(',')[1])}
                 onChange={(region, providers) => {
-                  setFieldValue('data', `${region},${providers.join('|')}`);
+                  const separator = providers.every((id) => id >= 0)
+                    ? '|'
+                    : ',';
+                  setFieldValue(
+                    'data',
+                    `${region},${providers.join(separator)}`
+                  );
                 }}
               />
             );
@@ -455,14 +405,16 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
               <WatchProviderSelector
                 type={'tv'}
                 region={slider?.data?.split(',')[0]}
-                activeProviders={
-                  slider?.data
-                    ?.split(',')[1]
-                    .split('|')
-                    .map((v) => Number(v)) ?? []
-                }
+                activeProviders={getIncludedIds(slider?.data?.split('|')[1])}
+                excludedProviders={getExcludedIds(slider?.data?.split(',')[1])}
                 onChange={(region, providers) => {
-                  setFieldValue('data', `${region},${providers.join('|')}`);
+                  const separator = providers.every((id) => id >= 0)
+                    ? '|'
+                    : ',';
+                  setFieldValue(
+                    'data',
+                    `${region},${providers.join(separator)}`
+                  );
                 }}
               />
             );

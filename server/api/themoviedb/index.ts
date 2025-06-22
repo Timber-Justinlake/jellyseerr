@@ -83,12 +83,15 @@ interface DiscoverMovieOptions {
   voteCountLte?: string;
   originalLanguage?: string;
   genre?: string;
+  withoutGenres?: string;
   studio?: string;
+  withoutStudios?: string;
   keywords?: string;
   withoutKeywords?: string;
   sortBy?: SortOptions;
   watchRegion?: string;
   watchProviders?: string;
+  withoutWatchProviders?: string;
   certification?: string;
   certificationGte?: string;
   certificationLte?: string;
@@ -109,12 +112,14 @@ interface DiscoverTvOptions {
   includeEmptyReleaseDate?: boolean;
   originalLanguage?: string;
   genre?: string;
+  withoutGenres?: string;
   network?: number;
   keywords?: string;
   withoutKeywords?: string;
   sortBy?: SortOptions;
   watchRegion?: string;
   watchProviders?: string;
+  withoutWatchProviders?: string;
   withStatus?: string; // Returning Series: 0 Planned: 1 In Production: 2 Ended: 3 Cancelled: 4 Pilot: 5
   certification?: string;
   certificationGte?: string;
@@ -487,7 +492,9 @@ class TheMovieDb extends ExternalAPI {
     primaryReleaseDateLte,
     originalLanguage,
     genre,
+    withoutGenres,
     studio,
+    withoutStudios,
     keywords,
     withoutKeywords,
     withRuntimeGte,
@@ -497,6 +504,7 @@ class TheMovieDb extends ExternalAPI {
     voteCountGte,
     voteCountLte,
     watchProviders,
+    withoutWatchProviders,
     watchRegion,
     certification,
     certificationGte,
@@ -538,7 +546,9 @@ class TheMovieDb extends ExternalAPI {
               ? defaultFutureDate
               : primaryReleaseDateLte,
           with_genres: genre,
+          without_genres: withoutGenres,
           with_companies: studio,
+          without_companies: withoutStudios,
           with_keywords: keywords,
           without_keywords: withoutKeywords,
           'with_runtime.gte': withRuntimeGte,
@@ -549,6 +559,7 @@ class TheMovieDb extends ExternalAPI {
           'vote_count.lte': voteCountLte,
           watch_region: watchRegion,
           with_watch_providers: watchProviders,
+          without_watch_providers: withoutWatchProviders,
           certification: certification,
           'certification.gte': certificationGte,
           'certification.lte': certificationLte,
@@ -571,6 +582,7 @@ class TheMovieDb extends ExternalAPI {
     includeEmptyReleaseDate = false,
     originalLanguage,
     genre,
+    withoutGenres,
     network,
     keywords,
     withoutKeywords,
@@ -581,6 +593,7 @@ class TheMovieDb extends ExternalAPI {
     voteCountGte,
     voteCountLte,
     watchProviders,
+    withoutWatchProviders,
     watchRegion,
     withStatus,
     certification,
@@ -623,6 +636,7 @@ class TheMovieDb extends ExternalAPI {
               : this.originalLanguage,
           include_null_first_air_dates: includeEmptyReleaseDate,
           with_genres: genre,
+          without_genres: withoutGenres,
           with_networks: network,
           with_keywords: keywords,
           without_keywords: withoutKeywords,
@@ -633,6 +647,7 @@ class TheMovieDb extends ExternalAPI {
           'vote_count.gte': voteCountGte,
           'vote_count.lte': voteCountLte,
           with_watch_providers: watchProviders,
+          without_watch_providers: withoutWatchProviders,
           watch_region: watchRegion,
           with_status: withStatus,
           certification: certification,

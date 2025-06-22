@@ -18,6 +18,7 @@ import {
   useUpdateQueryParams,
 } from '@app/hooks/useUpdateQueryParams';
 import defineMessages from '@app/utils/defineMessages';
+import { getExcludedIds, getIncludedIds } from '@app/utils/excludableHelpers';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { useIntl } from 'react-intl';
 import Datepicker from 'react-tailwindcss-datepicker-sct';
@@ -325,15 +326,14 @@ const FilterSlideover = ({
         <WatchProviderSelector
           type={type}
           region={currentFilters.watchRegion}
-          activeProviders={
-            currentFilters.watchProviders?.split('|').map((v) => Number(v)) ??
-            []
-          }
+          activeProviders={getIncludedIds(currentFilters.watchProviders)}
+          excludedProviders={getExcludedIds(currentFilters.watchProviders)}
           onChange={(region, providers) => {
+            const separator = providers.every((p) => p >= 0) ? '|' : ',';
             if (providers.length) {
               batchUpdateQueryParams({
                 watchRegion: region,
-                watchProviders: providers.join('|'),
+                watchProviders: providers.join(separator),
               });
             } else {
               batchUpdateQueryParams({
